@@ -35,10 +35,19 @@ def test_cat():
     print(c)
     print(torch.cat([c, a.expand(3, -1, -1)], dim=-1))
 
+def test_repeat2():
+    a = torch.tensor([[1, 2], [3, 4]])
+    b = a.repeat(1, 3)
+    c = b.view(2, 3, 2)
+    print(a)
+    print(b)
+    print(c)
+
 
 if __name__ == "__main__":
     # main()
     # test_embedding()
     # test_sum()
     # test_repeat()
-    test_cat()
+    # test_cat()
+    test_repeat2()

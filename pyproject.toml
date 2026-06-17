@@ -12,3 +12,6 @@ dependencies = [
     "tqdm>=4.68.2",
     "wandb>=0.27.2",
 ]
+
+[tool.setuptools]
+packages = ["mlp", "fastkan", "fasterkan", "mikan", "mikan_shared"]

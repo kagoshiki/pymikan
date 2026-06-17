@@ -8,14 +8,14 @@ from typing import *
 class SharedEdgeMLP(nn.Module):
     def __init__(
             self,
-            width: List[int],
+            widths: List[int],
             activation: Callable
         ):
         super().__init__()
         self.layers = nn.ModuleList()
         self.activation = activation
-        for i in range(len(width) - 1):
-            self.layers.append(nn.Linear(width[i], width[i + 1]))
+        for i in range(len(widths) - 1):
+            self.layers.append(nn.Linear(widths[i], widths[i + 1]))
 
     def forward(self, x):
         for i, layer in enumerate(self.layers):
@@ -31,12 +31,12 @@ class SharedMIKANLayer(nn.Module):
             self,
             input_dim: int,
             output_dim: int,
-            edge_mlp_hidden_width: List[int],
+            edge_mlp_hidden_widths: List[int],
             embedding_dim: int,
             activation: Callable
         ):
         super().__init__()
-        self.mlp = SharedEdgeMLP([1 + embedding_dim] + edge_mlp_hidden_width + [1], activation)
+        self.mlp = SharedEdgeMLP([1 + embedding_dim] + edge_mlp_hidden_widths + [1], activation)
         self.embedding = nn.Embedding(output_dim * input_dim, embedding_dim)
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -70,12 +70,11 @@ class SharedMIKANLayer(nn.Module):
         return x
 
 
-
 class SharedMIKAN(nn.Module):
     def __init__(
             self,
             widths: List[int],
-            edge_mlp_hidden_width: List[int],
+            edge_mlp_hidden_widths: List[int],
             embedding_dim: int = 16,
             activation: Callable = F.relu
         ):
@@ -85,7 +84,7 @@ class SharedMIKAN(nn.Module):
             SharedMIKANLayer(
                 input_dim=widths[i],
                 output_dim=widths[i + 1],
-                edge_mlp_hidden_width=edge_mlp_hidden_width,
+                edge_mlp_hidden_widths=edge_mlp_hidden_widths,
                 embedding_dim=embedding_dim,
                 activation=activation
             )
