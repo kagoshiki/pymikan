@@ -1,7 +1,7 @@
 import torch
 from torch import nn, optim
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
@@ -12,11 +12,10 @@ from mikan import MIKAN
 from mikan_shared import SharedMIKAN
 
 import wandb
-from tqdm import tqdm
 import time
 import datetime
 
-from experiments.fitting_class import train_model, test_model
+from experiments.fitting import train_model, test_model
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -24,12 +23,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 config = {
     # common
-    "model": "SharedMIKAN",
-    "batch_size": 64,
-    "widths": [784, 128, 10],
+    "model": "MLP",
+    "batch_size": 4,
+    "widths": [2, 2, 1],
     "optimizer": "AdamW",
     "learning_rate": 0.005,
-    "num_epoch": 20,
+    "num_epoch": 100,
 
     # FastKAN/FasterKAN
     "num_grids": 10,
@@ -39,7 +38,7 @@ config = {
     "edge_mlp_activation": "relu",
 
     # SharedMIKAN
-    "edge_mlp_hidden_widths": [32],
+    "edge_mlp_hidden_widths": [4],
     "embedding_dim": 8,
 }
 
@@ -66,23 +65,19 @@ OPTIMIZER = {
 
 
 def main():
-    wandb.init(project="pymikan", name=f"{config['model']}_{datetime.datetime.now()}", config=config)
+    wandb.init(project="pymikan_xor", name=f"{config['model']}_{datetime.datetime.now()}", config=config)
 
     batch_size = config["batch_size"]
-    learning_rate = config["learning_rate"]
     num_epoch = config["num_epoch"]
 
-    train_dataset = datasets.MNIST(
-        './data',
-        train = True,
-        download = True,
-        transform = ToTensor()
+    # XOR dataset
+    train_dataset = TensorDataset(
+        torch.tensor([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=torch.float32),
+        torch.tensor([[0], [1], [1], [0]], dtype=torch.float32)
     )
-    test_dataset = datasets.MNIST(
-        './data',
-        train = False,
-        download=True,
-        transform = ToTensor()
+    test_dataset = TensorDataset(
+        torch.tensor([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=torch.float32),
+        torch.tensor([[0], [1], [1], [0]], dtype=torch.float32)
     )
 
     train_loader = DataLoader(
@@ -98,29 +93,27 @@ def main():
 
     model = MODEL[config["model"]]()
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     optimizer = OPTIMIZER[config["optimizer"]](model.parameters())
 
     timer = 0
     for epoch in range(num_epoch):
         start = time.perf_counter()
-        train_loss, train_acc = train_model(model, train_loader, optimizer, criterion, device, True)
+        train_loss = train_model(model, train_loader, optimizer, criterion, device)
         epoch_time = time.perf_counter() - start
         timer += epoch_time
 
-        test_loss, test_acc = test_model(model, test_loader, criterion, device, True)
+        test_loss = test_model(model, test_loader, criterion, device)
     
         print(f"Epoch {epoch}:")
-        print(f"Train Accuracy: {train_acc}")
-        print(f"Test Accuracy: {test_acc}")
+        print(f"Train Loss: {train_loss}")
+        print(f"Test Loss: {test_loss}")
         print(f"Time: {epoch_time:.4f} seconds\n")
 
         wandb.log({
             "train_loss": train_loss,
-            "train_acc": train_acc,
             "test_loss": test_loss,
-            "test_acc": test_acc,
             "epoch_time": epoch_time
         })
 

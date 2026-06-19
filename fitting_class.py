@@ -14,6 +14,7 @@ def train_model(
         optimizer: Optimizer,
         criterion: nn.Module,
         device: torch.device,
+        flatten=False
     ):
 
     model.train()
@@ -21,6 +22,8 @@ def train_model(
 
     for inputs, labels in tqdm(train_loader, desc="Trainig", leave=False):
         inputs, labels = inputs.to(device), labels.to(device)
+        if flatten:
+            inputs = inputs.view(inputs.size(0), -1)
         optimizer.zero_grad()
 
         outputs = model(inputs)
@@ -33,8 +36,9 @@ def train_model(
         correct += torch.sum(preds == labels).item() / len(labels)
 
     avg_loss = total_loss / len(train_loader)
+    accuracy = correct / len(train_loader)
 
-    return avg_loss
+    return avg_loss, accuracy
 
 
 def test_model(
@@ -42,6 +46,7 @@ def test_model(
         test_loader: DataLoader,
         criterion: nn.Module,
         device: torch.device,
+        flatten=False
     ):
 
     model.eval()
@@ -50,6 +55,8 @@ def test_model(
     with torch.no_grad():
         for inputs, labels in tqdm(test_loader, desc="Evaluating", leave=False):
             inputs, labels = inputs.to(device), labels.to(device)
+            if flatten:
+                inputs = inputs.view(inputs.size(0), -1)
 
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -59,5 +66,6 @@ def test_model(
             correct += torch.sum(preds == labels).item() / len(labels)
 
         avg_loss = total_loss / len(test_loader)
+        accuracy = correct / len(test_loader)
 
-        return avg_loss
+        return avg_loss, accuracy
