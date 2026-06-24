@@ -13,13 +13,14 @@ def train_model(
         train_loader: DataLoader,
         optimizer: Optimizer,
         criterion: nn.Module,
-        device: torch.device,
+        device: torch.device, 
+        disable_tqdm: bool = False
     ):
 
     model.train()
     total_loss, correct = 0.0, 0.0
 
-    for inputs, labels in tqdm(train_loader, desc="Trainig", leave=False):
+    for inputs, labels in tqdm(train_loader, desc="Trainig", leave=False, disable=disable_tqdm):
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
 
@@ -42,13 +43,14 @@ def test_model(
         test_loader: DataLoader,
         criterion: nn.Module,
         device: torch.device,
+        disable_tqdm: bool = False
     ):
 
     model.eval()
     total_loss, correct = 0.0, 0.0
 
     with torch.no_grad():
-        for inputs, labels in tqdm(test_loader, desc="Evaluating", leave=False):
+        for inputs, labels in tqdm(test_loader, desc="Evaluating", leave=False, disable=disable_tqdm):
             inputs, labels = inputs.to(device), labels.to(device)
 
             outputs = model(inputs)
