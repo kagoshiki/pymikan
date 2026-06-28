@@ -150,5 +150,16 @@ def main():
         wandb.finish()
 
 
+def experiment_loop():
+    models = ["MLP", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN", "SharedMIKANSeparable"]
+    TRAINS_PER_MODEL = 10
+
+    for model_name in models:
+        config["model"] = model_name
+        for _ in range(TRAINS_PER_MODEL):
+            main()
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    experiment_loop()
