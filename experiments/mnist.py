@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 import torch
 from torch import nn, optim
 import torch.nn.functional as F
@@ -10,26 +14,33 @@ from fastkan import FastKAN
 from fasterkan import FasterKAN
 from mikan import MIKAN
 from mikan_shared import SharedMIKAN
+from mikan_shared import SharedMIKANSeparable
 
 import wandb
 from tqdm import tqdm
 import time
 import datetime
 
-from fitting_class import train_model, test_model
+from experiments.fitting_class import train_model, test_model
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 
+use_wandb = True
+
 config = {
     # common
-    "model": "SharedMIKAN",
+    "model": "FasterKAN",
     "batch_size": 64,
     "widths": [784, 128, 10],
     "optimizer": "AdamW",
     "learning_rate": 0.005,
     "num_epoch": 20,
+    "use_layernorm": True,
+
+    # MLP
+    "hidden_activation": "tanh",
 
     # FastKAN/FasterKAN
     "num_grids": 10,
@@ -39,23 +50,31 @@ config = {
     "edge_mlp_activation": "relu",
 
     # SharedMIKAN
-    "edge_mlp_hidden_widths": [32],
+    "edge_mlp_hidden_widths": [16],
     "embedding_dim": 8,
+    "embedding_std": 1.0,
+
+    # SharedMIKANSeparable
+    "in_embedding_dim": 8,
+    "out_embedding_dim": 8
 }
 
 ACTIVATION = {
     "relu": F.relu,
-    "sigmoid": torch.sigmoid,
-    "tanh": torch.tanh,
+    "sigmoid": F.sigmoid,
+    "tanh": F.tanh,
 }
 
 MODEL = {
-    "MLP": lambda: MLP(config["widths"]).to(device),
+    "MLP": lambda: MLP(config["widths"], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
     "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
-    "MIKAN": lambda: MIKAN(config["widths"], edge_mlp_d=config["edge_mlp_hidden_d"], activation=ACTIVATION[config["edge_mlp_activation"]]).to(device),
+    "MIKAN": lambda: MIKAN(config["widths"], edge_mlp_d=config["edge_mlp_hidden_d"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]).to(device),
     "SharedMIKAN": lambda: SharedMIKAN(
-        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], embedding_dim=config["embedding_dim"], activation=ACTIVATION[config["edge_mlp_activation"]]
+        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], embedding_dim=config["embedding_dim"], embedding_std=config["embedding_std"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]
+    ).to(device),
+    "SharedMIKANSeparable": lambda: SharedMIKANSeparable(
+        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], in_embedding_dim=config["in_embedding_dim"], out_embedding_dim=config["out_embedding_dim"], embedding_std=config["embedding_std"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]
     ).to(device),
 }
 
@@ -66,10 +85,10 @@ OPTIMIZER = {
 
 
 def main():
-    wandb.init(project="pymikan", name=f"{config['model']}_{datetime.datetime.now()}", config=config)
+    if use_wandb:
+        wandb.init(project="pymikan", name=f"{config['model']}_{datetime.datetime.now()}", config=config)
 
     batch_size = config["batch_size"]
-    learning_rate = config["learning_rate"]
     num_epoch = config["num_epoch"]
 
     train_dataset = datasets.MNIST(
@@ -116,17 +135,19 @@ def main():
         print(f"Test Accuracy: {test_acc}")
         print(f"Time: {epoch_time:.4f} seconds\n")
 
-        wandb.log({
-            "train_loss": train_loss,
-            "train_acc": train_acc,
-            "test_loss": test_loss,
-            "test_acc": test_acc,
-            "epoch_time": epoch_time
-        })
+        if use_wandb:
+            wandb.log({
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "test_loss": test_loss,
+                "test_acc": test_acc,
+                "epoch_time": epoch_time
+            })
 
     print(f"Time: {timer}")
 
-    wandb.finish()
+    if use_wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":

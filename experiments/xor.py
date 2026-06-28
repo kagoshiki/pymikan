@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 import torch
 from torch import nn, optim
 import torch.nn.functional as F
@@ -15,7 +19,7 @@ import wandb
 import time
 import datetime
 
-from fitting import train_model, test_model
+from experiments.fitting import train_model, test_model
 
 
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -29,6 +33,7 @@ config = {
     "optimizer": "Adam",
     "learning_rate": 0.05,
     "num_epoch": 5000,
+    "use_layernorm": False,
 
     # MLP
     "hidden_activation": "tanh",
@@ -43,21 +48,22 @@ config = {
     # SharedMIKAN
     "edge_mlp_hidden_widths": [4],
     "embedding_dim": 2,
+    "embedding_std": 1.0,
 }
 
 ACTIVATION = {
     "relu": F.relu,
-    "sigmoid": torch.sigmoid,
-    "tanh": torch.tanh,
+    "sigmoid": F.sigmoid,
+    "tanh": F.tanh,
 }
 
 MODEL = {
     "MLP": lambda: MLP(config["widths"], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
     "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
-    "MIKAN": lambda: MIKAN(config["widths"], edge_mlp_d=config["edge_mlp_hidden_d"], activation=ACTIVATION[config["edge_mlp_activation"]]).to(device),
+    "MIKAN": lambda: MIKAN(config["widths"], edge_mlp_d=config["edge_mlp_hidden_d"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]).to(device),
     "SharedMIKAN": lambda: SharedMIKAN(
-        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], embedding_dim=config["embedding_dim"], activation=ACTIVATION[config["edge_mlp_activation"]]
+        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], embedding_dim=config["embedding_dim"], embedding_std=config["embedding_std"], activation=ACTIVATION[config["edge_mlp_activation"]]
     ).to(device),
 }
 

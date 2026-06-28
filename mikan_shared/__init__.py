@@ -1,1 +1,1 @@
-from .mikan_shared import SharedMIKAN, SharedMIKANLayer
+from .mikan_shared import SharedMIKAN, SharedMIKANLayer, SharedMIKANSeparable, SharedMIKANSeparableLayer
