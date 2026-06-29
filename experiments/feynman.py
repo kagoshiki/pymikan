@@ -11,6 +11,7 @@ import time
 import datetime
 
 from mlp import MLP
+from efficientkan import KAN
 from fastkan import FastKAN
 from fasterkan import FasterKAN
 from mikan import MIKAN
@@ -25,10 +26,10 @@ use_wandb = False
 
 config = {
     # common
-    "model": "SharedMIKAN",
+    "model": "SharedMIKANSeparable",
     "feynman_eq": "I.6.2",
     "batch_size": 64,
-    "widths": [2, 64, 1],
+    "widths": [2, 2, 1, 1],
     "optimizer": "AdamW",
     "learning_rate": 0.01,
     "num_epoch": 300,
@@ -42,7 +43,7 @@ config = {
 
     # MIKAN
     "edge_mlp_hidden_d": 8,
-    "edge_mlp_activation": "relu",
+    "edge_mlp_activation": "tanh",
 
     # SharedMIKAN / SharedMIKANSeparable
     "edge_mlp_hidden_widths": [16, 16],
@@ -60,7 +61,8 @@ ACTIVATION = {
 
 MODEL = {
     "MLP": lambda: MLP(config["widths"], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
-    "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
+    "KAN": lambda: KAN(config["widths"]).to(device),
+    "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"], use_layernorm=config["use_layernorm"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "MIKAN": lambda: MIKAN(
         config["widths"], 
@@ -200,7 +202,7 @@ def main():
 
     print(f"Initializing {config['model']} with widths={config['widths']}...")
     model = MODEL[config["model"]]()
-    criterion = nn.MSELoss()
+    criterion = lambda outputs, targets: torch.sqrt(nn.MSELoss()(outputs, targets))     # RMSE Loss
     optimizer = OPTIMIZER[config["optimizer"]](model.parameters())
 
     timer = 0
@@ -218,8 +220,8 @@ def main():
 
         if (epoch + 1) % 50 == 0 or epoch == 0 or epoch == num_epoch - 1:
             print(f"Epoch {epoch}:")
-            print(f"Train Loss (MSE): {train_loss:.6f}")
-            print(f"Test Loss (MSE): {test_loss:.6f}")
+            print(f"Train Loss (RMSE): {train_loss:.6f}")
+            print(f"Test Loss (RMSE): {test_loss:.6f}")
             print(f"Time: {epoch_time:.4f} seconds\n")
 
         if use_wandb:
@@ -229,7 +231,7 @@ def main():
                 "epoch_time": epoch_time
             })
 
-    print(f"Training Finished. Best Test MSE: {best_test_loss:.6f}")
+    print(f"Training Finished. Best Test RMSE: {best_test_loss:.6f}")
     print(f"Total Time: {timer:.4f} seconds")
 
     if use_wandb:

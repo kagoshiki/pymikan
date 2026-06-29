@@ -31,16 +31,16 @@ use_wandb = True
 
 config = {
     # common
-    "model": "FasterKAN",
+    "model": "SharedMIKANSeparable",
     "batch_size": 64,
-    "widths": [784, 128, 10],
+    "widths": [784, 64, 10],
     "optimizer": "AdamW",
     "learning_rate": 0.005,
-    "num_epoch": 20,
+    "num_epoch": 50,
     "use_layernorm": True,
 
     # MLP
-    "hidden_activation": "tanh",
+    "hidden_activation": "relu",
 
     # FastKAN/FasterKAN
     "num_grids": 10,
@@ -55,8 +55,8 @@ config = {
     "embedding_std": 1.0,
 
     # SharedMIKANSeparable
-    "in_embedding_dim": 8,
-    "out_embedding_dim": 8
+    "in_embedding_dim": 16,
+    "out_embedding_dim": 16
 }
 
 ACTIVATION = {
@@ -161,5 +161,5 @@ def experiment_loop():
 
 
 if __name__ == "__main__":
-    # main()
-    experiment_loop()
+    main()
+    # experiment_loop()
