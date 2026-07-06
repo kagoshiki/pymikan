@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
+import random
 from tqdm import tqdm
 import numpy as np
 from matplotlib import pyplot as plt
@@ -12,6 +13,10 @@ import datetime
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
+
+seed = 43
+
+font_size = 20
 
 use_wandb = False
 
@@ -31,6 +36,14 @@ if use_wandb:
         name=f"mfa-{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
         config=config
     )
+
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 
 # Multi-Function Approximation using Multi-Layer Perceptron (MLP)
@@ -166,20 +179,22 @@ def train_mfa_mlp():
         plt.figure()
         plt.plot(x.cpu().numpy(), y_true.cpu().numpy(), label="Ground Truth")
         plt.plot(x.cpu().numpy(), y_pred.detach().cpu().numpy(), label="MLP Approximation")
-        plt.title(f"{function_names[i]}")
+        plt.title(f"{function_names[i]}", fontsize=font_size)
         if i == len(functions) - 1:
             plt.ylim(-1.0, 1.0)
         plt.legend()
         # plt.savefig(f"results/function_{i + 1}.svg", format="svg", bbox_inches="tight")
         plt.close()
 
-        ax[i // 4, i % 4].plot(x.cpu().numpy(), y_true.cpu().numpy(), label="Ground Truth")
-        ax[i // 4, i % 4].plot(x.cpu().numpy(), y_pred.detach().cpu().numpy(), label="MLP Approximation")
-        ax[i // 4, i % 4].set_title(f"{function_names[i]}\nMSE: {mse_loss:.8f}")
+        ax[i // 4, i % 4].plot(x.cpu().numpy(), y_true.cpu().numpy(), label="Ground Truth", linewidth=3, linestyle="--")
+        ax[i // 4, i % 4].plot(x.cpu().numpy(), y_pred.detach().cpu().numpy(), label="MLP Approximation", linewidth=3)
+        ax[i // 4, i % 4].set_title(f"{function_names[i]}\nMSE: {mse_loss:.8f}", fontsize=font_size)
+        ax[i // 4, i % 4].set_xticks([])
+        ax[i // 4, i % 4].set_yticks([])
         if i == len(functions) - 1:
             ax[i // 4, i % 4].set_ylim(-1.0, 1.0)
         if i == 0:
-            ax[i // 4, i % 4].legend()
+            ax[i // 4, i % 4].legend(fontsize=16, loc="upper left")
 
         if use_wandb:
             wandb.log({
@@ -190,7 +205,7 @@ def train_mfa_mlp():
                     title=function_names[i]
                 )
             })
-    fig.savefig("results/all_functions.eps", bbox_inches="tight")
+    fig.savefig("results/all_functions.svg", bbox_inches="tight")
 
     # Output Embedding Vectors
     embeddings = model.embedding.weight.data.cpu().numpy()
@@ -210,4 +225,5 @@ def train_mfa_mlp():
 
 
 if __name__ == "__main__":
+    set_seed(seed)
     train_mfa_mlp()

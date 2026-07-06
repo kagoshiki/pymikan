@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
+import random
+import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -18,6 +20,10 @@ from experiments.fitting_reg import train_model, test_model
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+seed = 43
+
+font_size = 20
+
 config = {
     "widths": [2, 1, 1],
     "batch_size": 32,
@@ -26,6 +32,13 @@ config = {
     "num_samples": 1000,
 }
 
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 # y = exp(sin(pi * x1) + x2^2)
 def generate_data(num_samples: int = 1000):
@@ -55,7 +68,7 @@ def plot_edge_functions(model: SharedMIKAN):
     embedding2 = layer1.embedding.weight[1]
     embedding3 = layer2.embedding.weight[0]
 
-    fig, ax = plt.subplots(1, 3, figsize=(18, 5))
+    fig, ax = plt.subplots(1, 3, figsize=(16, 5))
     titles = ["x1 -> h", "x2 -> h", "h -> y"]
 
     for i in range(3):
@@ -71,12 +84,15 @@ def plot_edge_functions(model: SharedMIKAN):
             embedding = embedding3
 
         y = get_edge_output(x, mlp, embedding)
-        ax[i].plot(x.cpu().numpy(), y.detach().cpu().numpy())
-        ax[i].set_title(titles[i])
-        ax[i].set_xlabel("x")
-        ax[i].set_ylabel("y")
+        ax[i].plot(x.cpu().numpy(), y.detach().cpu().numpy(), linewidth=3)
+        ax[i].set_title(titles[i], fontsize=font_size)
+        ax[i].set_xlabel("x", fontsize=font_size)
+        ax[i].set_ylabel("y", fontsize=font_size)
+        ax[i].tick_params(axis='both', which='major', labelsize=font_size)
+        # ax[i].set_box_aspect(1)
 
-    fig.savefig("results/edge_functions.eps", bbox_inches="tight")
+    plt.tight_layout()
+    fig.savefig("results/edge_functions.svg", bbox_inches="tight")
 
 
 def main():
@@ -107,4 +123,5 @@ def main():
 
 
 if __name__ == "__main__":
+    set_seed(seed)
     main()
