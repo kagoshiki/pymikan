@@ -14,3 +14,5 @@ wandb/
 
 # datasets
 data/
+
+results/

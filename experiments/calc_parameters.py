@@ -10,11 +10,11 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 from mlp import MLP
+from efficientkan import KAN
 from fastkan import FastKAN
 from fasterkan import FasterKAN
 from mikan import MIKAN
-from mikan_shared import SharedMIKAN
-from mikan_shared import SharedMIKANSeparable
+from mikan_shared import SharedMIKAN, SharedMIKANSeparable, SharedMIKANSeparableMixing
 
 
 def count_parameters(model):
@@ -27,15 +27,20 @@ def count_trainable_parameters(model):
 
 def main():
     widths = [784, 64, 10]
+    mlp_widths = [784, 8, 10]
     # widths = [6, 4, 2, 1]
 
     models = {
-        "MLP": MLP(widths),
-        "FastKAN": FastKAN(widths, num_grids=10),
-        "FasterKAN": FasterKAN(widths, num_grids=10),
+        "MLP": MLP(mlp_widths),
+        "MLP-S": MLP([784, 8, 10]),
+        "MLP-L": MLP([784, 784, 10]),
+        "KAN": KAN(widths, grid_size=8),
+        "FastKAN": FastKAN(widths, num_grids=12),
+        "FasterKAN": FasterKAN(widths, num_grids=12),
         "MIKAN": MIKAN(widths, edge_mlp_d=4),
-        "SharedMIKAN": SharedMIKAN(widths, edge_mlp_hidden_widths=[16], embedding_dim=8, embedding_std=1.0),
-        "SharedMIKANSeparable": SharedMIKANSeparable(widths, edge_mlp_hidden_widths=[16], in_embedding_dim=4, out_embedding_dim=4)
+        "SharedMIKAN": SharedMIKAN(widths, edge_mlp_hidden_widths=[16], embedding_dim=12, embedding_std=1.0),
+        "SharedMIKANSeparable": SharedMIKANSeparable(widths, edge_mlp_hidden_widths=[16], in_embedding_dim=6, out_embedding_dim=6),
+        "SharedMIKANSeparableMixing": SharedMIKANSeparableMixing(widths, edge_mlp_hidden_widths=[16], in_embedding_dim=6, out_embedding_dim=6, mixed_embedding_dim=12),
     }
 
     for name, model in models.items():

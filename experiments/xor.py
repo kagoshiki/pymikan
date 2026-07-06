@@ -19,7 +19,7 @@ import wandb
 import time
 import datetime
 
-from experiments.fitting import train_model, test_model
+from experiments.fitting_reg import train_model, test_model
 
 
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

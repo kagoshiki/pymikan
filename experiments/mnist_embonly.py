@@ -29,16 +29,16 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 use_wandb = True
 
-project_name = "pymikan-mnist"
+project_name = "pymikan-mnist-embedding-only"
 
 config = {
     # common
-    "model": "MLP",
+    "model": "SharedMIKAN",
     "batch_size": 64,
     "widths": [784, 64, 10],
     "optimizer": "AdamW",
     "learning_rate": 0.005,
-    "num_epoch": 50,
+    "num_epoch": 30,
     "use_layernorm": True,
 
     # MLP
@@ -58,7 +58,9 @@ config = {
 
     # SharedMIKANSeparable
     "in_embedding_dim": 6,
-    "out_embedding_dim": 6
+    "out_embedding_dim": 6,
+
+    "embedding_only_num_epoch": 20
 }
 
 ACTIVATION = {
@@ -69,8 +71,6 @@ ACTIVATION = {
 
 MODEL = {
     "MLP": lambda: MLP([784, 8, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
-    "MLP-S" : lambda: MLP([784, 8, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
-    "MLP-L" : lambda: MLP([784, 784, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
     "KAN": lambda: KAN(config["widths"]).to(device),
     "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
@@ -152,11 +152,46 @@ def main():
                 "epoch_time": epoch_time
             })
 
-            if epoch == num_epoch - 1:
-                wandb.summary["final_train_loss"] = train_loss
-                wandb.summary["final_train_acc"] = train_acc
-                wandb.summary["final_test_loss"] = test_loss
-                wandb.summary["final_test_acc"] = test_acc
+    # Learn Embedding vectors only
+    if config["model"] in ["SharedMIKAN", "SharedMIKANSeparable", "SharedMIKANSeparableMixing"]:
+        print("Learning Embedding vectors only...")
+        for param in model.parameters():
+            param.requires_grad = False
+        for layer in model.layers:
+            if config["model"] == "SharedMIKAN":
+                layer.embedding.weight.requires_grad = True
+            elif config["model"] in ["SharedMIKANSeparable", "SharedMIKANSeparableMixing"]:
+                layer.in_embedding.weight.requires_grad = True
+                layer.out_embedding.weight.requires_grad = True
+
+        optimizer = OPTIMIZER[config["optimizer"]](model.parameters())
+        for epoch in range(config["embedding_only_num_epoch"]):
+            start = time.perf_counter()
+            train_loss, train_acc = train_model(model, train_loader, optimizer, criterion, device, True)
+            epoch_time = time.perf_counter() - start
+            timer += epoch_time
+
+            test_loss, test_acc = test_model(model, test_loader, criterion, device, True)
+        
+            print(f"Embedding Epoch {epoch}:")
+            print(f"Train Accuracy: {train_acc}")
+            print(f"Test Accuracy: {test_acc}")
+            print(f"Time: {epoch_time:.4f} seconds\n")
+
+            if use_wandb:
+                wandb.log({
+                    "train_loss": train_loss,
+                    "train_acc": train_acc,
+                    "test_loss": test_loss,
+                    "test_acc": test_acc,
+                    "epoch_time": epoch_time
+                })
+
+                if epoch == config["embedding_only_num_epoch"] - 1:
+                    wandb.summary["final_train_loss"] = train_loss
+                    wandb.summary["final_train_acc"] = train_acc
+                    wandb.summary["final_test_loss"] = test_loss
+                    wandb.summary["final_test_acc"] = test_acc
 
     print(f"Time: {timer}")
     if use_wandb:
@@ -169,7 +204,7 @@ def main():
 def experiment_loop():
     # models = ["MLP", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN", "SharedMIKANSeparable"]
     # models = ["FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN", "SharedMIKANSeparable"]
-    models = ["MLP-S", "MLP-L"]
+    models = ["SharedMIKAN", "SharedMIKANSeparable", "SharedMIKANSeparableMixing"]
     TRAINS_PER_MODEL = 10
 
     for model_name in models:
@@ -195,23 +230,7 @@ def embedding_dim_experiment_loop():
                 main()
 
 
-def edge_mlp_hidden_widths_experiment_loop():
-    global project_name
-    project_name = "pymikan-mnist-edge-mlp-hidden-widths"
-    models = ["SharedMIKAN", "SharedMIKANSeparable", "SharedMIKANSeparableMixing"]
-    TRAINS_PER_MODEL = 10
-
-    for model_name in models:
-        config["model"] = model_name
-        for edge_mlp_hidden_widths in [[4], [8], [32], [64]]:
-            config["edge_mlp_hidden_widths"] = edge_mlp_hidden_widths
-            for _ in range(TRAINS_PER_MODEL):
-                main()
-
-
 if __name__ == "__main__":
     # main()
-    # experiment_loop()
+    experiment_loop()
     # embedding_dim_experiment_loop()
-    edge_mlp_hidden_widths_experiment_loop()
-    
