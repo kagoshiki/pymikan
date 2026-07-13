@@ -214,10 +214,11 @@ def train_mfa_mlp():
         plt.figure()
         plt.scatter(embeddings[:, 0], embeddings[:, 1], c=np.arange(num_func), cmap="tab10")
         for i in range(num_func):
-            plt.text(embeddings[i, 0] + 0.01, embeddings[i, 1], function_names[i], fontsize=9)
+            plt.text(embeddings[i, 0] + 0.08, embeddings[i, 1], function_names[i][2:], fontsize=12)
         plt.title("Embedding Vectors")
         plt.grid(True)
-        plt.savefig("results/function_embeddings.svg", format="svg", bbox_inches="tight")
+        plt.tick_params(labelsize=12)
+        plt.savefig("results/function_embeddings.svg", bbox_inches="tight")
         plt.close()
 
     if use_wandb:

@@ -94,7 +94,7 @@ OPTIMIZER = {
 
 def main():
     if use_wandb:
-        wandb.init(project=project_name, name=f"{config['model']}_{datetime.datetime.now()}", config=config, group=config["model"])
+        wandb.init(project=project_name, name=f"{config['model']}_{datetime.datetime.now()}", config=config, group=config["model"]+"_")
 
     batch_size = config["batch_size"]
     num_epoch = config["num_epoch"]
@@ -131,6 +131,7 @@ def main():
 
     timer = 0
     for epoch in range(num_epoch):
+    # for epoch in range(0):
         start = time.perf_counter()
         train_loss, train_acc = train_model(model, train_loader, optimizer, criterion, device, True)
         epoch_time = time.perf_counter() - start
@@ -163,6 +164,9 @@ def main():
             elif config["model"] in ["SharedMIKANSeparable", "SharedMIKANSeparableMixing"]:
                 layer.in_embedding.weight.requires_grad = True
                 layer.out_embedding.weight.requires_grad = True
+            if config["model"] == "SharedMIKANSeparableMixing":
+                for param in layer.mixing_mlp.parameters():
+                    param.requires_grad = True
 
         optimizer = OPTIMIZER[config["optimizer"]](model.parameters())
         for epoch in range(config["embedding_only_num_epoch"]):
@@ -204,7 +208,8 @@ def main():
 def experiment_loop():
     # models = ["MLP", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN", "SharedMIKANSeparable"]
     # models = ["FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN", "SharedMIKANSeparable"]
-    models = ["SharedMIKAN", "SharedMIKANSeparable", "SharedMIKANSeparableMixing"]
+    # models = ["SharedMIKAN", "SharedMIKANSeparable", "SharedMIKANSeparableMixing"]
+    models = ["SharedMIKANSeparableMixing"]
     TRAINS_PER_MODEL = 10
 
     for model_name in models:
@@ -215,10 +220,10 @@ def experiment_loop():
 
 def embedding_dim_experiment_loop():
     global project_name
-    project_name = "pymikan-mnist-embedding-dim"
+    project_name = "pymikan-mnist-embedding-dim-eo"
     # models = ["SharedMIKAN", "SharedMIKANSeparable"]
     models = ["SharedMIKANSeparableMixing"]
-    TRAINS_PER_MODEL = 10
+    TRAINS_PER_MODEL = 5
 
     for model_name in models:
         config["model"] = model_name
@@ -230,7 +235,22 @@ def embedding_dim_experiment_loop():
                 main()
 
 
+def edge_mlp_hidden_widths_experiment_loop():
+    global project_name
+    project_name = "pymikan-mnist-edge-mlp-hidden-widths-eo"
+    models = ["SharedMIKANSeparableMixing"]
+    TRAINS_PER_MODEL = 5
+
+    for model_name in models:
+        config["model"] = model_name
+        for edge_mlp_hidden_widths in [[4], [8], [32], [64]]:
+            config["edge_mlp_hidden_widths"] = edge_mlp_hidden_widths
+            for _ in range(TRAINS_PER_MODEL):
+                main()
+
+
 if __name__ == "__main__":
     # main()
-    experiment_loop()
-    # embedding_dim_experiment_loop()
+    # experiment_loop()
+    embedding_dim_experiment_loop()
+    edge_mlp_hidden_widths_experiment_loop()

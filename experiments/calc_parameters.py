@@ -40,7 +40,7 @@ def main():
         "MIKAN": MIKAN(widths, edge_mlp_d=4),
         "SharedMIKAN": SharedMIKAN(widths, edge_mlp_hidden_widths=[16], embedding_dim=12, embedding_std=1.0),
         "SharedMIKANSeparable": SharedMIKANSeparable(widths, edge_mlp_hidden_widths=[16], in_embedding_dim=6, out_embedding_dim=6),
-        "SharedMIKANSeparableMixing": SharedMIKANSeparableMixing(widths, edge_mlp_hidden_widths=[16], in_embedding_dim=6, out_embedding_dim=6, mixed_embedding_dim=12),
+        "SharedMIKANSeparableMixing": SharedMIKANSeparableMixing(widths, edge_mlp_hidden_widths=[64], in_embedding_dim=6, out_embedding_dim=6, mixed_embedding_dim=12),
     }
 
     for name, model in models.items():
