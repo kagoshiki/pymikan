@@ -9,15 +9,13 @@ from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
-from mlp import MLP
-from fastkan import FastKAN
-from fasterkan import FasterKAN
-from mikan import MIKAN
-from mikan_shared import SharedMIKAN
+from src.models.mlp import MLP
+from src.models.fastkan import FastKAN
+from src.models.fasterkan import FasterKAN
+from src.models.mikan import MIKAN
+from src.models.shared_mikan import SharedMIKANEdgeWiseEmb
 
-import wandb
 import time
-import datetime
 
 from experiments.fitting_reg import train_model, test_model
 
@@ -46,9 +44,9 @@ config = {
     "edge_mlp_activation": "relu",
 
     # SharedMIKAN
-    "edge_mlp_hidden_widths": [4],
+    "shared_edge_mlp_hidden_widths": [4],
     "embedding_dim": 2,
-    "embedding_std": 1.0,
+    "embedding_init_std": 1.0,
 }
 
 ACTIVATION = {
@@ -62,21 +60,19 @@ MODEL = {
     "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "MIKAN": lambda: MIKAN(config["widths"], edge_mlp_d=config["edge_mlp_hidden_d"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]).to(device),
-    "SharedMIKAN": lambda: SharedMIKAN(
-        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], embedding_dim=config["embedding_dim"], embedding_std=config["embedding_std"], activation=ACTIVATION[config["edge_mlp_activation"]]
+    "SharedMIKAN": lambda: SharedMIKANEdgeWiseEmb(
+        config["widths"], shared_edge_mlp_hidden_widths=config["shared_edge_mlp_hidden_widths"], embedding_dim=config["embedding_dim"], embedding_init_std=config["embedding_init_std"], activation=ACTIVATION[config["edge_mlp_activation"]]
     ).to(device),
 }
 
 OPTIMIZER = {
     "SGD": lambda params: optim.SGD(params, lr=config["learning_rate"]),
     "Adam": lambda params: optim.Adam(params, lr=config["learning_rate"]),
-    "AdamW": lambda params: optim.AdamW(params, lr=config["learning_rate"], weight_decay=1e-5),
+    "AdamW": lambda params: optim.AdamW(params, lr=config["learning_rate"]),
 }
 
 
 def main():
-    # wandb.init(project="pymikan_xor", name=f"{config['model']}_{datetime.datetime.now()}", config=config)
-
     batch_size = config["batch_size"]
     num_epoch = config["num_epoch"]
 
@@ -114,27 +110,12 @@ def main():
         epoch_time = time.perf_counter() - start
         timer += epoch_time
 
-        # test_loss = test_model(model, test_loader, criterion, device, disable_tqdm=True)
-    
-        # print(f"Epoch {epoch}:")
-        # print(f"Loss: {train_loss}")
-        # print(f"Test Loss: {test_loss}")
-        # print(f"Time: {epoch_time:.4f} seconds\n")
-
-        # wandb.log({
-        #     "train_loss": train_loss,
-        #     "test_loss": test_loss,
-        #     "epoch_time": epoch_time
-        # })
-
     print(f"Time: {timer}")
 
     print(f"[0, 0] -> {F.sigmoid(model(torch.tensor([[0, 0]], dtype=torch.float32).to(device))).item():.6f}")
     print(f"[0, 1] -> {F.sigmoid(model(torch.tensor([[0, 1]], dtype=torch.float32).to(device))).item():.6f}")
     print(f"[1, 0] -> {F.sigmoid(model(torch.tensor([[1, 0]], dtype=torch.float32).to(device))).item():.6f}")
     print(f"[1, 1] -> {F.sigmoid(model(torch.tensor([[1, 1]], dtype=torch.float32).to(device))).item():.6f}")
-
-    # wandb.finish()
 
 
 if __name__ == "__main__":

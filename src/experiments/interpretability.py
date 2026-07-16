@@ -14,7 +14,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from mikan_shared import SharedMIKAN, SharedMIKANSeparable, SharedMIKANSeparableMixing
+from src.models.shared_mikan import SharedMIKANEdgeWiseEmb
 from experiments.fitting_reg import train_model, test_model
 
 

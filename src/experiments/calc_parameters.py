@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import torch
 from torch import nn, optim
@@ -9,12 +9,12 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
-from mlp import MLP
-from efficientkan import KAN
-from fastkan import FastKAN
-from fasterkan import FasterKAN
-from mikan import MIKAN
-from mikan_shared import SharedMIKAN, SharedMIKANSeparable, SharedMIKANSeparableMixing
+from src.models.mlp import MLP
+from src.models.efficientkan import KAN
+from src.models.fastkan import FastKAN
+# from src.models.fasterkan import FasterKAN
+from src.models.mikan import MIKAN
+from src.models.shared_mikan import SharedMIKANEdgeWiseEmb, SharedMIKANNodeWiseEmb
 
 
 def count_parameters(model):
@@ -36,11 +36,11 @@ def main():
         "MLP-L": MLP([784, 784, 10]),
         "KAN": KAN(widths, grid_size=8),
         "FastKAN": FastKAN(widths, num_grids=12),
-        "FasterKAN": FasterKAN(widths, num_grids=12),
+        # "FasterKAN": FasterKAN(widths, num_grids=12),
         "MIKAN": MIKAN(widths, edge_mlp_d=4),
-        "SharedMIKAN": SharedMIKAN(widths, edge_mlp_hidden_widths=[16], embedding_dim=12, embedding_std=1.0),
-        "SharedMIKANSeparable": SharedMIKANSeparable(widths, edge_mlp_hidden_widths=[16], in_embedding_dim=6, out_embedding_dim=6),
-        "SharedMIKANSeparableMixing": SharedMIKANSeparableMixing(widths, edge_mlp_hidden_widths=[64], in_embedding_dim=6, out_embedding_dim=6, mixed_embedding_dim=12),
+        "SharedMIKAN": SharedMIKANEdgeWiseEmb(widths, shared_edge_mlp_hidden_widths=[16], embedding_dim=12),
+        "SharedMIKANSeparable": SharedMIKANNodeWiseEmb(widths, shared_edge_mlp_hidden_widths=[16], in_embedding_dim=6, out_embedding_dim=6),
+        "SharedMIKANSeparableMixing": SharedMIKANNodeWiseEmb(widths, shared_edge_mlp_hidden_widths=[16], in_embedding_dim=6, out_embedding_dim=6, emb_mixing_mlp_hidden_output_widths=[12, 12]),
     }
 
     for name, model in models.items():
