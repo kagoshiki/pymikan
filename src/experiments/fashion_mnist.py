@@ -27,9 +27,9 @@ from src.experiments.fitting_class import train_model, test_model
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 
-use_wandb = False
+use_wandb = True
 
-project_name = "mikan-mnist"
+project_name = "mikan-fashion-mnist"
 
 config = {
     # common
@@ -120,20 +120,20 @@ OPTIMIZER = {
 }
 
 
-def train_on_mnist():
+def train_on_fashion_mnist():
     if use_wandb:
         wandb.init(project=project_name, name=f"{config['model']}_{datetime.datetime.now()}", config=config, group=config["model"])
 
     batch_size = config["batch_size"]
     num_epoch = config["num_epoch"]
 
-    train_dataset = datasets.MNIST(
+    train_dataset = datasets.FashionMNIST(
         './data',
         train = True,
         download = True,
         transform = ToTensor()
     )
-    test_dataset = datasets.MNIST(
+    test_dataset = datasets.FashionMNIST(
         './data',
         train = False,
         download=True,
@@ -195,19 +195,19 @@ def train_on_mnist():
 
 
 def run_trials():
-    # models = ["MLP", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
-    models = ["MLP-S", "MLP-L"]
+    models = ["MLP-S", "MLP-L", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
+    # models = ["MLP-S", "MLP-L"]
     TRAINS_PER_MODEL = 10
 
     for model_name in models:
         config["model"] = model_name
         for _ in range(TRAINS_PER_MODEL):
-            train_on_mnist()
+            train_on_fashion_mnist()
 
 
 def sweep_embedding_dim():
     global project_name
-    project_name = "mikan-mnist-embedding-dim"
+    project_name = "mikan-fashion-mnist-embedding-dim"
     models = ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
     TRAINS_PER_MODEL = 10
 
@@ -218,12 +218,12 @@ def sweep_embedding_dim():
             config["in_embedding_dim"] = embedding_dim // 2
             config["out_embedding_dim"] = embedding_dim // 2
             for _ in range(TRAINS_PER_MODEL):
-                train_on_mnist()
+                train_on_fashion_mnist()
 
 
 def sweep_shared_edge_mlp_hidden_widths():
     global project_name
-    project_name = "mikan-mnist-shared-edge-mlp-hidden-widths"
+    project_name = "mikan-fashion-mnist-shared-edge-mlp-hidden-widths"
     models = ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
     TRAINS_PER_MODEL = 10
 
@@ -232,12 +232,12 @@ def sweep_shared_edge_mlp_hidden_widths():
         for shared_edge_mlp_hidden_widths in [[4], [8], [32], [64]]:
             config["shared_edge_mlp_hidden_widths"] = shared_edge_mlp_hidden_widths
             for _ in range(TRAINS_PER_MODEL):
-                train_on_mnist()
+                train_on_fashion_mnist()
 
 
 if __name__ == "__main__":
-    train_on_mnist()
-    # run_trials()
+    # train_on_fashion_mnist()
+    run_trials()
     # sweep_embedding_dim()
     # sweep_shared_edge_mlp_hidden_widths()
     

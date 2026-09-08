@@ -4,8 +4,8 @@ import torch.nn.functional as F
 import math
 from typing import *
 from torch.autograd import Function
-from fasterkan.feature_extractor import EnhancedFeatureExtractor
-from fasterkan.fasterkan_layers import FasterKANLayer
+from .feature_extractor import EnhancedFeatureExtractor
+from .fasterkan_layers import FasterKANLayer
 
 class FasterKAN(nn.Module):
     def __init__(

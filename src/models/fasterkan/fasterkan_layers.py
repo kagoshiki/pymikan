@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 from typing import *
 from torch.autograd import Function
-from fasterkan.fasterkan_basis import ReflectionalSwitchFunction, SplineLinear
+from .fasterkan_basis import ReflectionalSwitchFunction, SplineLinear
 
 class FasterKANLayer(nn.Module):
     def __init__(
