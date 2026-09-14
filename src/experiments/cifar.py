@@ -7,6 +7,7 @@ from torch import nn, optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import datasets
+from torchvision import transforms
 from torchvision.transforms import ToTensor
 
 from src.models.mlp import MLP
@@ -15,6 +16,7 @@ from src.models.fastkan import FastKAN
 from src.models.fasterkan import FasterKAN
 from src.models.mikan import MIKAN
 from src.models.shared_mikan import SharedMIKANEdgeWiseEmb, SharedMIKANNodeWiseEmb
+from src.models.resnet import resnet20, resnet32, resnet44, resnet56, resnet110, resnet1202
 
 import wandb
 from tqdm import tqdm
@@ -29,16 +31,16 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 use_wandb = True
 
-project_name = "mikan-fashion-mnist"
+project_name = "mikan-cifar"
 
 config = {
     # common
     "model": "KAN",
-    "batch_size": 64,
-    "widths": [784, 64, 10],
-    "optimizer": "AdamW",
-    "learning_rate": 0.005,
-    "num_epoch": 50,
+    "batch_size": 128,
+    "widths": [64, 32, 10],
+    "optimizer": "SGD",
+    "learning_rate": 0.1,
+    "num_epoch": 150,
     "use_layernorm": True,
 
     # MLP
@@ -73,9 +75,9 @@ ACTIVATION = {
 }
 
 MODEL = {
-    "MLP": lambda: MLP([784, 64, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
-    "MLP-S" : lambda: MLP([784, 8, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
-    "MLP-L" : lambda: MLP([784, 784, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP": lambda: MLP([64, 32, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP-S" : lambda: MLP([64, 32, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP-L" : lambda: MLP([64, 32, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
     "KAN": lambda: KAN(config["widths"]).to(device),
     "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
@@ -115,29 +117,38 @@ MODEL = {
 }
 
 OPTIMIZER = {
-    "SGD": lambda params: optim.SGD(params, lr=config["learning_rate"]),
+    "SGD": lambda params: optim.SGD(params, lr=config["learning_rate"], momentum=0.9, weight_decay=1e-4),
     "AdamW": lambda params: optim.AdamW(params, lr=config["learning_rate"]),
 }
 
 
-def train_on_fashion_mnist():
+def train_on_cifar():
     if use_wandb:
         wandb.init(project=project_name, name=f"{config['model']}_{datetime.datetime.now()}", config=config, group=config["model"])
 
     batch_size = config["batch_size"]
     num_epoch = config["num_epoch"]
 
-    train_dataset = datasets.FashionMNIST(
-        './data',
-        train = True,
-        download = True,
-        transform = ToTensor()
-    )
-    test_dataset = datasets.FashionMNIST(
-        './data',
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    train_dataset = datasets.CIFAR10(
+        root='./data',
+        train=True,
+        transform=transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, 4),
+            transforms.ToTensor(),
+            normalize,
+        ]), download=True)
+    test_dataset = datasets.CIFAR10(
+        root='./data',
         train = False,
         download=True,
-        transform = ToTensor()
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
     )
 
     train_loader = DataLoader(
@@ -151,20 +162,25 @@ def train_on_fashion_mnist():
         shuffle = False
     )
 
-    model = MODEL[config["model"]]()
+    classifier = MODEL[config["model"]]()
+    model = resnet32().to(device)
+    model.linear = classifier
 
     criterion = nn.CrossEntropyLoss()
 
     optimizer = OPTIMIZER[config["optimizer"]](model.parameters())
 
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100])
+
     timer = 0
     for epoch in range(num_epoch):
         start = time.perf_counter()
-        train_loss, train_acc = train_model(model, train_loader, optimizer, criterion, device, True)
+        train_loss, train_acc = train_model(model, train_loader, optimizer, criterion, device, False)
         epoch_time = time.perf_counter() - start
+        lr_scheduler.step()
         timer += epoch_time
 
-        test_loss, test_acc = test_model(model, test_loader, criterion, device, True)
+        test_loss, test_acc = test_model(model, test_loader, criterion, device, False)
     
         print(f"Epoch {epoch}:")
         print(f"Train Accuracy: {train_acc}")
@@ -195,14 +211,14 @@ def train_on_fashion_mnist():
 
 
 def run_trials():
-    # models = ["MLP-S", "MLP-L", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
-    models = ["KAN"]
-    TRAINS_PER_MODEL = 10
+    models = ["MLP-S", "MLP-L", "KAN", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
+    # models = ["MLP-S", "MLP-L"]
+    TRAINS_PER_MODEL = 5
 
     for model_name in models:
         config["model"] = model_name
         for _ in range(TRAINS_PER_MODEL):
-            train_on_fashion_mnist()
+            train_on_cifar()
 
 
 def sweep_embedding_dim():
@@ -218,7 +234,7 @@ def sweep_embedding_dim():
             config["in_embedding_dim"] = embedding_dim // 2
             config["out_embedding_dim"] = embedding_dim // 2
             for _ in range(TRAINS_PER_MODEL):
-                train_on_fashion_mnist()
+                train_on_cifar()
 
 
 def sweep_shared_edge_mlp_hidden_widths():
@@ -232,11 +248,11 @@ def sweep_shared_edge_mlp_hidden_widths():
         for shared_edge_mlp_hidden_widths in [[4], [8], [32], [64]]:
             config["shared_edge_mlp_hidden_widths"] = shared_edge_mlp_hidden_widths
             for _ in range(TRAINS_PER_MODEL):
-                train_on_fashion_mnist()
+                train_on_cifar()
 
 
 if __name__ == "__main__":
-    # train_on_fashion_mnist()
+    # train_on_cifar()
     run_trials()
     # sweep_embedding_dim()
     # sweep_shared_edge_mlp_hidden_widths()

@@ -168,6 +168,8 @@ class SharedMIKANNodeWiseEmbLayer(nn.Module):
 
     def reset_parameters(self):
         self.shared_edge_mlp.reset_parameters()
+        if hasattr(self, 'emb_mixing_mlp'):
+            self.emb_mixing_mlp.reset_parameters()
         nn.init.normal_(self.in_embedding.weight, std=self.embedding_init_std)
         nn.init.normal_(self.out_embedding.weight, std=self.embedding_init_std)
 

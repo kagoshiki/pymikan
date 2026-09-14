@@ -29,7 +29,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 use_wandb = True
 
-project_name = "mikan-fashion-mnist"
+project_name = "mikan-fashion-mnist-embonly-v2"
 
 config = {
     # common
@@ -38,7 +38,8 @@ config = {
     "widths": [784, 64, 10],
     "optimizer": "AdamW",
     "learning_rate": 0.005,
-    "num_epoch": 50,
+    "num_epoch": 30,
+    "embedding_only_num_epoch": 20,
     "use_layernorm": True,
 
     # MLP
@@ -121,9 +122,10 @@ OPTIMIZER = {
 
 
 def train_on_fashion_mnist():
-    if use_wandb:
-        wandb.init(project=project_name, name=f"{config['model']}_{datetime.datetime.now()}", config=config, group=config["model"])
 
+    if use_wandb:
+            wandb.init(project=project_name, name=f"{config['model']}_{datetime.datetime.now()}", config=config, group=config["model"]+"_")
+    
     batch_size = config["batch_size"]
     num_epoch = config["num_epoch"]
 
@@ -159,6 +161,7 @@ def train_on_fashion_mnist():
 
     timer = 0
     for epoch in range(num_epoch):
+    # for epoch in range(0):
         start = time.perf_counter()
         train_loss, train_acc = train_model(model, train_loader, optimizer, criterion, device, True)
         epoch_time = time.perf_counter() - start
@@ -180,11 +183,49 @@ def train_on_fashion_mnist():
                 "epoch_time": epoch_time
             })
 
-            if epoch == num_epoch - 1:
-                wandb.summary["final_train_loss"] = train_loss
-                wandb.summary["final_train_acc"] = train_acc
-                wandb.summary["final_test_loss"] = test_loss
-                wandb.summary["final_test_acc"] = test_acc
+    # Learn Embedding vectors only
+    if config["model"] in ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]:
+        print("Learning Embedding vectors only...")
+        for param in model.parameters():
+            param.requires_grad = False
+        for layer in model.layers:
+            if config["model"] == "SharedMIKAN_EdgeWiseEmbedding":
+                layer.embedding.weight.requires_grad = True
+            elif config["model"] in ["SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]:
+                layer.in_embedding.weight.requires_grad = True
+                layer.out_embedding.weight.requires_grad = True
+            if config["model"] == "SharedMIKAN_NodeWiseEmbeddingWithMixing":
+                for param in layer.emb_mixing_mlp.parameters():
+                    param.requires_grad = True
+
+        optimizer = OPTIMIZER[config["optimizer"]](model.parameters())
+        for epoch in range(config["embedding_only_num_epoch"]):
+            start = time.perf_counter()
+            train_loss, train_acc = train_model(model, train_loader, optimizer, criterion, device, True)
+            epoch_time = time.perf_counter() - start
+            timer += epoch_time
+
+            test_loss, test_acc = test_model(model, test_loader, criterion, device, True)
+        
+            print(f"Embedding Epoch {epoch}:")
+            print(f"Train Accuracy: {train_acc}")
+            print(f"Test Accuracy: {test_acc}")
+            print(f"Time: {epoch_time:.4f} seconds\n")
+
+            if use_wandb:
+                wandb.log({
+                    "train_loss": train_loss,
+                    "train_acc": train_acc,
+                    "test_loss": test_loss,
+                    "test_acc": test_acc,
+                    "epoch_time": epoch_time
+                })
+
+                if epoch == config["embedding_only_num_epoch"] - 1:
+                    wandb.summary["final_train_loss"] = train_loss
+                    wandb.summary["final_train_acc"] = train_acc
+                    wandb.summary["final_test_loss"] = test_loss
+                    wandb.summary["final_test_acc"] = test_acc
 
     print(f"Time: {timer}")
     if use_wandb:
@@ -196,8 +237,8 @@ def train_on_fashion_mnist():
 
 def run_trials():
     # models = ["MLP-S", "MLP-L", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
-    models = ["KAN"]
-    TRAINS_PER_MODEL = 10
+    models = ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding"]
+    TRAINS_PER_MODEL = 1
 
     for model_name in models:
         config["model"] = model_name
