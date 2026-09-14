@@ -59,7 +59,7 @@ class SharedMIKANEdgeWiseEmbLayer(nn.Module):
         self.embedding_init_std = embedding_init_std
 
         if use_layernorm:
-            self.layernorm = nn.LayerNorm(output_dim)
+            self.layernorm = nn.LayerNorm(input_dim)
 
         self.reset_parameters()
 
@@ -69,6 +69,9 @@ class SharedMIKANEdgeWiseEmbLayer(nn.Module):
 
     def forward(self, x: torch.Tensor):
         batch_size = x.size(0)
+
+        if hasattr(self, 'layernorm'):
+            x = self.layernorm(x)
 
         # (batch_size, input_dim) -> (batch_size, output_dim * input_dim)
         x = x.repeat(1, self.output_dim)
@@ -92,9 +95,6 @@ class SharedMIKANEdgeWiseEmbLayer(nn.Module):
 
         # (batch_size, output_dim, input_dim) -> (batch_size, output_dim)
         x = x.sum(dim=-1)
-
-        if hasattr(self, 'layernorm'):
-            x = self.layernorm(x)
 
         return x
 
@@ -162,7 +162,7 @@ class SharedMIKANNodeWiseEmbLayer(nn.Module):
         self.embedding_init_std = embedding_init_std
 
         if use_layernorm:
-            self.layernorm = nn.LayerNorm(output_dim)
+            self.layernorm = nn.LayerNorm(input_dim)
 
         self.reset_parameters()
 
@@ -175,6 +175,9 @@ class SharedMIKANNodeWiseEmbLayer(nn.Module):
 
     def forward(self, x: torch.Tensor):
         batch_size = x.size(0)
+
+        if hasattr(self, 'layernorm'):
+            x = self.layernorm(x)
 
         # (batch_size, input_dim) -> (batch_size, output_dim * input_dim)
         x = x.repeat(1, self.output_dim)
@@ -209,9 +212,6 @@ class SharedMIKANNodeWiseEmbLayer(nn.Module):
 
         # (batch_size, output_dim, input_dim) -> (batch_size, output_dim)
         x = x.sum(dim=-1)
-
-        if hasattr(self, 'layernorm'):
-            x = self.layernorm(x)
 
         return x
 

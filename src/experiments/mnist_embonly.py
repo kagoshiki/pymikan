@@ -9,12 +9,12 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
-from mlp import MLP
-from efficientkan import KAN
-from fastkan import FastKAN
-from fasterkan import FasterKAN
-from mikan import MIKAN
-from mikan_shared import SharedMIKAN, SharedMIKANSeparable, SharedMIKANSeparableMixing
+from src.models.mlp import MLP
+from src.models.efficientkan import KAN
+from src.models.fastkan import FastKAN
+from src.models.fasterkan import FasterKAN
+from src.models.mikan import MIKAN
+from src.models.shared_mikan import SharedMIKANEdgeWiseEmb, SharedMIKANNodeWiseEmb
 
 import wandb
 from tqdm import tqdm
@@ -70,20 +70,50 @@ ACTIVATION = {
 }
 
 MODEL = {
-    "MLP": lambda: MLP([784, 8, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP": lambda: MLP([784, 64, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP-S" : lambda: MLP([784, 8, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP-L" : lambda: MLP([784, 784, 10], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
     "KAN": lambda: KAN(config["widths"]).to(device),
     "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
-    "MIKAN": lambda: MIKAN(config["widths"], edge_mlp_d=config["edge_mlp_hidden_d"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]).to(device),
-    "SharedMIKAN": lambda: SharedMIKAN(
-        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], embedding_dim=config["embedding_dim"], embedding_std=config["embedding_std"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]
+    "MIKAN": lambda: MIKAN(
+        config["widths"],
+        edge_mlp_d=config["edge_mlp_hidden_d"],
+        activation=ACTIVATION[config["edge_mlp_activation"]],
+        use_layernorm=config["use_layernorm"]
     ).to(device),
-    "SharedMIKANSeparable": lambda: SharedMIKANSeparable(
-        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], in_embedding_dim=config["in_embedding_dim"], out_embedding_dim=config["out_embedding_dim"], embedding_std=config["embedding_std"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]
+    "SharedMIKAN_EdgeWiseEmbedding": lambda: SharedMIKANEdgeWiseEmb(
+        config["widths"],
+        shared_edge_mlp_hidden_widths=config["shared_edge_mlp_hidden_widths"],
+        embedding_dim=config["embedding_dim"],
+        embedding_init_std=config["embedding_init_std"],
+        activation=ACTIVATION[config["edge_mlp_activation"]],
+        use_layernorm=config["use_layernorm"]
     ).to(device),
-    "SharedMIKANSeparableMixing": lambda: SharedMIKANSeparableMixing(
-        config["widths"], edge_mlp_hidden_widths=config["edge_mlp_hidden_widths"], in_embedding_dim=config["in_embedding_dim"], out_embedding_dim=config["out_embedding_dim"], mixed_embedding_dim=config["embedding_dim"], embedding_std=config["embedding_std"], activation=ACTIVATION[config["edge_mlp_activation"]], use_layernorm=config["use_layernorm"]
+    "SharedMIKAN_NodeWiseEmbedding": lambda: SharedMIKANNodeWiseEmb(
+        config["widths"],
+        shared_edge_mlp_hidden_widths=config["shared_edge_mlp_hidden_widths"],
+        in_embedding_dim=config["in_embedding_dim"],
+        out_embedding_dim=config["out_embedding_dim"],
+        embedding_init_std=config["embedding_init_std"],
+        activation=ACTIVATION[config["edge_mlp_activation"]],
+        use_layernorm=config["use_layernorm"]
     ).to(device),
+    "SharedMIKAN_NodeWiseEmbeddingWithMixing": lambda: SharedMIKANNodeWiseEmb(
+        config["widths"],
+        shared_edge_mlp_hidden_widths=config["shared_edge_mlp_hidden_widths"],
+        in_embedding_dim=config["in_embedding_dim"],
+        out_embedding_dim=config["out_embedding_dim"],
+        emb_mixing_mlp_hidden_output_widths=config["emb_mixing_mlp_hidden_output_widths"],
+        embedding_init_std=config["embedding_init_std"],
+        activation=ACTIVATION[config["edge_mlp_activation"]],
+        use_layernorm=config["use_layernorm"]
+    ).to(device),
+}
+
+OPTIMIZER = {
+    "SGD": lambda params: optim.SGD(params, lr=config["learning_rate"]),
+    "AdamW": lambda params: optim.AdamW(params, lr=config["learning_rate"], weight_decay=1e-5),
 }
 
 OPTIMIZER = {
@@ -154,17 +184,17 @@ def main():
             })
 
     # Learn Embedding vectors only
-    if config["model"] in ["SharedMIKAN", "SharedMIKANSeparable", "SharedMIKANSeparableMixing"]:
+    if config["model"] in ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]:
         print("Learning Embedding vectors only...")
         for param in model.parameters():
             param.requires_grad = False
         for layer in model.layers:
-            if config["model"] == "SharedMIKAN":
+            if config["model"] == "SharedMIKAN_EdgeWiseEmbedding":
                 layer.embedding.weight.requires_grad = True
-            elif config["model"] in ["SharedMIKANSeparable", "SharedMIKANSeparableMixing"]:
+            elif config["model"] in ["SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]:
                 layer.in_embedding.weight.requires_grad = True
                 layer.out_embedding.weight.requires_grad = True
-            if config["model"] == "SharedMIKANSeparableMixing":
+            if config["model"] == "SharedMIKAN_NodeWiseEmbeddingWithMixing":
                 for param in layer.mixing_mlp.parameters():
                     param.requires_grad = True
 
@@ -206,10 +236,7 @@ def main():
 
 
 def experiment_loop():
-    # models = ["MLP", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN", "SharedMIKANSeparable"]
-    # models = ["FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN", "SharedMIKANSeparable"]
-    # models = ["SharedMIKAN", "SharedMIKANSeparable", "SharedMIKANSeparableMixing"]
-    models = ["SharedMIKANSeparableMixing"]
+    models = ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
     TRAINS_PER_MODEL = 10
 
     for model_name in models:
@@ -221,8 +248,7 @@ def experiment_loop():
 def embedding_dim_experiment_loop():
     global project_name
     project_name = "pymikan-mnist-embedding-dim-eo"
-    # models = ["SharedMIKAN", "SharedMIKANSeparable"]
-    models = ["SharedMIKANSeparableMixing"]
+    models = ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
     TRAINS_PER_MODEL = 5
 
     for model_name in models:
@@ -238,7 +264,7 @@ def embedding_dim_experiment_loop():
 def edge_mlp_hidden_widths_experiment_loop():
     global project_name
     project_name = "pymikan-mnist-edge-mlp-hidden-widths-eo"
-    models = ["SharedMIKANSeparableMixing"]
+    models = ["SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]  
     TRAINS_PER_MODEL = 5
 
     for model_name in models:
