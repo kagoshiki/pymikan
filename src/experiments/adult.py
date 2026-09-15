@@ -81,8 +81,8 @@ ACTIVATION = {
 
 MODEL = {
     "MLP": lambda: MLP([104, 64, 2], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
-    "MLP-S" : lambda: MLP([104, 8, 2], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
-    "MLP-L" : lambda: MLP([104, 104, 2], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP-S" : lambda: MLP([104, 24, 2], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
+    "MLP-L" : lambda: MLP([104, 800, 2], hidden_activation=ACTIVATION[config["hidden_activation"]]).to(device),
     "KAN": lambda: KAN(config["widths"]).to(device),
     "FastKAN": lambda: FastKAN(config["widths"], num_grids=config["num_grids"]).to(device),
     "FasterKAN": lambda: FasterKAN(config["widths"], num_grids=config["num_grids"]).to(device),
@@ -396,8 +396,8 @@ def train_on_adult():
 
 
 def run_trials():
-    models = ["MLP-S", "MLP-L", "KAN", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
-    # models = ["KAN"]
+    # models = ["MLP-S", "MLP-L", "KAN", "FastKAN", "FasterKAN", "MIKAN", "SharedMIKAN_EdgeWiseEmbedding", "SharedMIKAN_NodeWiseEmbedding", "SharedMIKAN_NodeWiseEmbeddingWithMixing"]
+    models = ["MLP-S", "MLP-L"]
     TRAINS_PER_MODEL = 5
 
     for model_name in models:

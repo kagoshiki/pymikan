@@ -26,8 +26,14 @@ def count_trainable_parameters(model):
 
 
 def main():
-    widths = [784, 64, 10]
-    mlp_widths = [784, 8, 10]
+    # widths = [784, 64, 10]
+    # widths = [54, 64, 7]
+    widths = [104, 64, 2]
+    # mlp_widths = [784, 8, 10]
+    # mlp_widths = [54, 800, 7]
+    # mlp_widths = [54, 34, 7]
+    # mlp_widths = [104, 800, 2]
+    mlp_widths = [104, 24, 2]
     # widths = [6, 4, 2, 1]
 
     models = {
